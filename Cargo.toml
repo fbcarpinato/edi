@@ -6,3 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cursive = "0.20.0"
+cursive_core = "0.3.7"
+syntect = "5.2.0"
+unicode-width = "0.1.11"

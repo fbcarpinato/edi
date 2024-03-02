@@ -8,6 +8,20 @@ enum RopeNode {
     },
 }
 
+impl RopeNode {
+    fn to_string(&self, result: &mut String) {
+        match self {
+            RopeNode::Leaf { value } => {
+                result.push_str(value);
+            }
+            RopeNode::Concatenate { left, right } => {
+                left.to_string(result);
+                right.to_string(result);
+            }
+        }
+    }
+}
+
 pub struct Rope {
     root: RopeNode,
     len: usize,
@@ -19,7 +33,7 @@ impl Rope {
             root: RopeNode::Leaf {
                 value: String::new(),
             },
-            len: 0
+            len: 0,
         }
     }
 
@@ -30,5 +44,10 @@ impl Rope {
             },
             len: s.len(),
         }
+    }
+    pub fn to_string(&self) -> String {
+        let mut result = String::with_capacity(self.len);
+        self.root.to_string(&mut result);
+        result
     }
 }
