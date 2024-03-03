@@ -6,6 +6,8 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(content: &str) -> Editor {
-        Editor { data: Rope::from_str(content) }
+        Editor {
+            data: Rope::from_str(content),
+        }
     }
 }

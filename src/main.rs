@@ -1,93 +1,81 @@
-pub mod editor;
-pub mod rope;
-pub mod syntect_lib;
+extern crate cursive;
 
+use cursive::event::{Event, Key};
 use cursive::traits::*;
-use syntect::{highlighting::ThemeSet, parsing::SyntaxSet};
-
-use std::rc::Rc;
-
-use editor::Editor;
-
-struct State {
-    syntax_set: SyntaxSet,
-    themes: ThemeSet,
-    editor: Editor,
-}
+use cursive::views::{DummyView, EditView, Layer, LinearLayout, TextArea};
+use cursive::Cursive;
 
 fn main() {
     let mut siv = cursive::default();
 
-    let syntax_set = SyntaxSet::load_defaults_newlines();
-    let themes = ThemeSet::load_defaults();
+    let text_editor = TextArea::new()
+        .disabled()
+        .with_name("text_editor")
+        .full_screen();
 
-    siv.set_user_data(Rc::new(State {
-        syntax_set,
-        themes,
-        editor: Editor::new(""),
-    }));
+    let command_bar = EditView::new()
+        .filler(" ")
+        .on_submit(process_command)
+        .with_name("command_bar")
+        .min_width(20);
 
-    siv.add_global_callback('r', |s| {
-        let file: String = std::fs::read_to_string("./src/main.rs").unwrap();
+    let layout = LinearLayout::vertical()
+        .child(Layer::new(text_editor))
+        .child(DummyView.fixed_height(1))
+        .child(command_bar);
 
-        s.set_user_data(Rc::new(State {
-            syntax_set: SyntaxSet::load_defaults_newlines(),
-            themes: ThemeSet::load_defaults(),
-            editor: Editor::new(&file),
-        }));
+    siv.add_layer(layout);
 
+    siv.add_global_callback('i', |s| {
+        s.focus_name("text_editor").unwrap();
 
-        apply_theme(s, "InspiredGitHub");
+        s.call_on_name("command_bar", |view: &mut EditView| {
+            view.set_content("");
+        });
+
+        s.call_on_name("text_editor", |view: &mut TextArea| {
+            view.enable();
+        });
     });
 
-    siv.add_fullscreen_layer(
-        cursive::views::TextView::new("")
-            .with_name("content")
-            .scrollable()
-            .full_screen(),
-    );
-
-    siv.with_theme(|t| {
-        t.shadow = false;
+    siv.add_global_callback(':', move |s| {
+        s.call_on_name("command_bar", |view: &mut EditView| {
+            view.set_content(":");
+        });
+        s.focus_name("command_bar").unwrap();
     });
 
-    apply_theme(&mut siv, "InspiredGitHub");
+    siv.add_global_callback(Event::Key(Key::Esc), |s| {
+        s.call_on_name("text_editor", |view: &mut TextArea| {
+            view.disable();
+        });
 
-    siv.add_global_callback('q', |s| s.quit());
+        s.call_on_name("command_bar", |view: &mut EditView| {
+            view.set_content("");
+        });
+        s.focus_name("text_editor").unwrap();
+    });
 
     siv.run();
 }
 
-fn apply_theme(siv: &mut cursive::Cursive, theme_name: &str) {
-    let state = siv
-        .with_user_data(|s: &mut Rc<State>| Rc::clone(s))
-        .unwrap();
+fn process_command(s: &mut Cursive, command: &str) {
+    let command = command.trim_start_matches(':');
 
-    let theme = &state.themes.themes[theme_name];
-    let syntax = state.syntax_set.find_syntax_by_token("rs").unwrap();
-    let mut highlighter = syntect::easy::HighlightLines::new(syntax, theme);
+    match command {
+        "q" => s.quit(),
+        "clear" => {
+            s.call_on_name("text_editor", |view: &mut TextArea| {
+                view.set_content("");
+            });
+        }
+        _ => {
+            s.add_layer(cursive::views::Dialog::info("Unknown command"));
+        }
+    }
 
-    siv.with_theme(|t| {
-        if let Some(background) = theme.settings.background.map(syntect_lib::translate_color) {
-            t.palette[cursive::theme::PaletteColor::Background] = background;
-            t.palette[cursive::theme::PaletteColor::View] = background;
-        }
-        if let Some(foreground) = theme.settings.foreground.map(syntect_lib::translate_color) {
-            t.palette[cursive::theme::PaletteColor::Primary] = foreground;
-            t.palette[cursive::theme::PaletteColor::TitlePrimary] = foreground;
-        }
-
-        if let Some(highlight) = theme.settings.highlight.map(syntect_lib::translate_color) {
-            t.palette[cursive::theme::PaletteColor::Highlight] = highlight;
-        }
+    s.call_on_name("command_bar", |view: &mut EditView| {
+        view.set_content("");
     });
-
-    let content = state.editor.data.to_string();
-
-    let styled = syntect_lib::parse(content, &mut highlighter, &state.syntax_set).unwrap();
-
-    siv.call_on_name("content", |t: &mut cursive::views::TextView| {
-        t.set_content(styled);
-    })
-    .unwrap();
+    s.focus_name("text_editor").unwrap();
 }
